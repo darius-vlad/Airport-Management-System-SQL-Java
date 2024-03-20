@@ -1,0 +1,31 @@
+CREATE PROCEDURE IntroduceExceptii()
+BEGIN
+    -- Selectăm salariul minim și maxim dintre piloții certificați
+    DECLARE min_salariu DECIMAL;
+    DECLARE max_salariu DECIMAL;
+
+    SELECT MIN(salariu), MAX(salariu) INTO min_salariu, max_salariu
+    FROM Angajati
+    WHERE idan IN (SELECT idan FROM Certificare);
+
+    -- Inserăm în Excepții aeronavele cu piloții având salariul minim sau maxim
+    INSERT INTO Exceptii (idav, numeav, gama_croaziera, natura_exceptiei)
+    SELECT idav, numeav, gama_croaziera,
+           CASE 
+               WHEN salariu = min_salariu THEN 'Salariu Minim'
+               WHEN salariu = max_salariu THEN 'Salariu Maxim'
+           END AS natura_exceptiei
+    FROM (
+        SELECT 
+            A.idav,
+            A.numeav,
+            A.gama_croaziera,
+            AN.salariu,
+            ROW_NUMBER() OVER (PARTITION BY A.idav ORDER BY AN.salariu) AS rn
+        FROM Aeronave A
+        JOIN Certificare C ON A.idav = C.idav
+        JOIN Angajati AN ON C.idan = AN.idan
+        WHERE AN.salariu = min_salariu OR AN.salariu = max_salariu
+    ) AS RankedData
+    WHERE rn = 1; -- Un Window function care ne asigura faptul ca trecem prin fiecare idav o singura data
+END//
